@@ -16,6 +16,31 @@ def generate_launch_description():
 
     return LaunchDescription([
 
+        # robot5 odom -> base_link TF
+        Node(
+            package='multi_robot_lab',
+            executable='odom_tf_relay',
+            name='odom_tf_relay',
+            namespace='robot5',
+            remappings=[
+                ('/tf', 'tf'),
+            ],
+            output='screen',
+        ),
+
+        # robot11 odom -> base_link TF
+        Node(
+            package='multi_robot_lab',
+            executable='odom_tf_relay',
+            name='odom_tf_relay',
+            namespace='robot11',
+            remappings=[
+                ('/tf', 'tf'),
+            ],
+            output='screen',
+        ),
+
+        # robot5/11 TF -> global /tf relay
         Node(
             package='multi_robot_lab',
             executable='tf_relay',
@@ -23,6 +48,7 @@ def generate_launch_description():
             output='screen',
         ),
 
+        # world -> robot5/map
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
@@ -40,6 +66,7 @@ def generate_launch_description():
             output='screen',
         ),
 
+        # world -> robot11/map
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',

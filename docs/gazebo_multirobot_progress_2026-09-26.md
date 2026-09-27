@@ -118,3 +118,267 @@ world
     └── robot11/odom
         └── robot11/base_link
 
+
+# 2026-09-28 진행 기록
+
+## 1. robot5 / robot11 TF 복구 완료
+
+기존 Gazebo TF 경로에서 odom -> base_link TF가 안정적으로 나오지 않는 문제가 있었다.
+
+Odometry 토픽 자체는 정상:
+- /robot5/odom
+  - frame_id: robot5/odom
+  - child_frame_id: robot5/base_link
+- /robot11/odom
+  - frame_id: robot11/odom
+  - child_frame_id: robot11/base_link
+
+커스텀 odom_tf_relay를 사용해 Odometry 데이터를 TF로 변환하도록 구성했다.
+
+확인 완료:
+
+robot5:
+robot5/map
+└── robot5/odom
+    └── robot5/base_link
+
+robot11:
+robot11/map
+└── robot11/odom
+    └── robot11/base_link
+
+tf2_echo에서 다음 체인을 모두 확인했다.
+
+robot5:
+- robot5/odom -> robot5/base_link
+- robot5/map -> robot5/odom
+- robot5/map -> robot5/base_link
+
+robot11:
+- robot11/odom -> robot11/base_link
+- robot11/map -> robot11/odom
+- robot11/map -> robot11/base_link
+
+## 2. support.launch.py 개선
+
+기존 support.launch.py에 다음 두 노드를 추가했다.
+
+- /robot5/odom_tf_relay
+- /robot11/odom_tf_relay
+
+현재 support.launch.py 역할:
+
+- robot5 odom -> base_link TF relay
+- robot11 odom -> base_link TF relay
+- robot5/11 namespaced TF -> global /tf relay
+- world -> robot5/map static TF
+- world -> robot11/map static TF
+- RViz 실행
+
+따라서 별도 터미널에서 odom_tf_relay를 수동 실행할 필요가 없도록 정리했다.
+
+## 3. LiDAR / SLAM 상태
+
+수동 ros_gz_bridge를 통해 두 로봇 scan 데이터 정상 확인.
+
+- /robot5/scan 정상
+- /robot11/scan 정상
+
+robot5에서는 약 19Hz 수준까지 확인했다.
+
+slam_toolbox:
+- /robot5/slam_toolbox active
+- /robot11/slam_toolbox active
+
+robot5 /robot5/tf에서 반복적으로 다음 두 transform 확인:
+
+- robot5/map -> robot5/odom
+- robot5/odom -> robot5/base_link
+
+## 4. Nav2 lifecycle 활성화
+
+robot5 초기 bringup 과정에서 lifecycle manager가 다음과 같은 일시적인 서비스 오류를 냈다.
+
+route_server/get_state service client:
+async_send_request failed
+
+또한 controller_server/get_state 서비스를 오랫동안 기다리는 현상이 있었다.
+
+하지만 이후 상태 확인 결과 robot5와 robot11 모두 주요 Nav2 lifecycle 노드가 active [3] 상태가 되었다.
+
+확인 노드:
+
+- controller_server
+- smoother_server
+- planner_server
+- behavior_server
+- route_server
+- bt_navigator
+- velocity_smoother
+- collision_monitor
+
+robot11도 동일하게 모두 active [3].
+
+route_server 노드와 get_state/change_state 서비스 자체는 robot5/11 모두 존재했으므로
+route_server 설정 자체의 문제로 판단하지 않았다.
+
+## 5. explore_lite 진행
+
+robot5 explore_lite 실행 시:
+
+Waiting for costmap to become available, topic: map
+
+이후:
+
+Waiting to connect to move_base nav2 server
+
+단계까지 진행했다.
+
+Nav2 controller 로그에서는 실제 goal 및 path가 전달됨을 확인:
+
+- Received a goal, begin computing control effort.
+- Passing new path to controller.
+- Failed to make progress
+
+따라서 explore -> Nav2 goal 전달은 동작하고 있으나 실제 robot5 이동이 지속되지 않는 문제가 남아 있다.
+
+## 6. robot5 속도 명령 경로 확인
+
+토픽:
+
+- /robot5/cmd_vel_nav
+- /robot5/cmd_vel_smoothed
+- /robot5/cmd_vel
+- /robot5/cmd_vel_unstamped
+- /robot5/diffdrive_controller/cmd_vel
+
+구조 확인:
+
+controller_server
+-> /robot5/cmd_vel_nav
+-> velocity_smoother
+-> /robot5/cmd_vel_smoothed
+-> collision_monitor
+-> /robot5/cmd_vel
+-> motion_control
+-> /robot5/diffdrive_controller/cmd_vel
+-> diff_drive_controller / Gazebo
+
+motion_control:
+- /robot5/cmd_vel 구독
+- /robot5/cmd_vel_unstamped 구독
+- /robot5/diffdrive_controller/cmd_vel 발행
+
+controller_manager 상태:
+
+- diffdrive_controller active
+- joint_state_broadcaster active
+
+## 7. 직접 구동 테스트
+
+robot5 undock:
+- 성공
+- motion_control 로그에서 "Undock Goal Succeeded" 확인
+
+RotateAngle 테스트:
+
+요청:
+- angle: 1.57 rad
+- max_rotation_speed: 0.35 rad/s
+
+실제 /robot5/diffdrive_controller/cmd_vel에서:
+
+angular.z ~= 0.35
+
+확인.
+
+로봇은 조금 회전했으나 90도 전체 회전 전에 중단됨.
+
+마지막 feedback 예:
+
+remaining_angle_travel: 1.403721...
+
+결과:
+Goal finished with status: ABORTED
+
+DriveDistance 테스트:
+
+요청:
+- distance: -0.25 m
+- max_translation_speed: 0.20 m/s
+
+처음에 로봇이 조금 이동했으나 이후 정지.
+
+feedback가 반복적으로 거의 동일하게 유지:
+
+remaining_travel_distance ~= -0.3477
+
+따라서 액션 서버 및 motion_control 명령 생성 자체는 동작하지만
+실제 로봇 이동이 중간에 멈추는 원인은 추가 확인이 필요하다.
+
+## 8. hazard 확인
+
+/robot5/hazard_detection:
+
+detections: []
+
+/robot5/ir_intensity:
+
+value: 15
+
+현재 확인된 시점에는 bumper/cliff 계열 hazard가 직접 검출되지는 않았다.
+
+## 9. 현재 가장 큰 환경 문제: FastDDS SHM
+
+오늘 전체 테스트 동안 반복적으로 다음 오류 발생:
+
+RTPS_TRANSPORT_SHM Error
+Failed init_port fastrtps_port7085:
+open_and_lock_file failed
+
+증상:
+
+- ros2 lifecycle get 응답이 매우 늦음
+- service discovery가 수십 초 지연됨
+- ros2 topic echo가 메시지를 못 받는 경우 발생
+- ros2 topic pub 실행 중 context invalid 오류 발생
+- failed to create timer
+- failed to initialize wait set
+
+FASTDDS_BUILTIN_TRANSPORTS=UDPv4를 테스트 터미널에 적용하여 일부 CLI 테스트를 계속 진행했으나
+전체 실행환경 자체는 이미 SHM 오류가 누적된 상태였다.
+
+따라서 다음 세션에서는 로봇 구동 문제를 더 추적하기 전에
+모든 ROS/Gazebo 프로세스를 완전히 종료한 상태에서 FastDDS SHM을 먼저 정리한다.
+
+## 10. 다음 시작 지점
+
+다음 세션 순서:
+
+1. 모든 ROS/Gazebo 프로세스 종료 상태 확인
+2. FastDDS SHM 상태 확인 및 안전하게 cleanup
+3. ros2 node list 등 CLI 응답 정상 여부 확인
+4. Gazebo + robot5 하나만 최소 구성으로 실행
+5. robot5 undock
+6. RotateAngle / DriveDistance 단독 구동 테스트
+7. 정상 구동 확인 후 SLAM + Nav2 추가
+8. robot5 explore_lite 재실행
+9. robot11 추가
+10. map_merge 진행
+
+현재까지 해결 완료:
+
+- 두 로봇 LiDAR
+- 두 로봇 SLAM
+- robot5/11 odom -> base_link TF
+- map -> odom -> base_link 전체 TF 체인
+- global TF relay
+- support.launch.py 통합
+- Nav2 lifecycle 활성화
+- explore -> Nav2 goal 전달 확인
+
+현재 핵심 미해결:
+
+- FastDDS SHM 오류
+- robot5가 RotateAngle / DriveDistance 중 조금 움직인 뒤 멈추는 문제
+- 안정적인 AutoSLAM 실제 주행
