@@ -382,3 +382,74 @@ FASTDDS_BUILTIN_TRANSPORTS=UDPv4를 테스트 터미널에 적용하여 일부 C
 - FastDDS SHM 오류
 - robot5가 RotateAngle / DriveDistance 중 조금 움직인 뒤 멈추는 문제
 - 안정적인 AutoSLAM 실제 주행
+
+---
+
+# 2026-10-04 Gazebo 멀티로봇 실습 종료
+
+## 최종 상태
+
+Gazebo 기반 TurtleBot4 멀티로봇 실습은 아래 항목까지 검증하였다.
+
+- TurtleBot4 2대 namespace 분리
+  - `/robot5`
+  - `/robot11`
+- 각 로봇 odom / TF 구조 분리
+- `odom -> base_link` TF relay 구현
+- namespaced TF를 global `/tf`, `/tf_static`으로 relay
+- `world -> robot5/map`
+- `world -> robot11/map`
+- RViz2에서 멀티로봇 TF / RobotModel / Scan / Map 구성
+- robot5 / robot11 각각 `slam_toolbox` 실행
+- robot5 / robot11 각각 Nav2 lifecycle active 확인
+- `explore_lite`에서 Nav2 goal 전달까지 확인
+- Gazebo LiDAR raw topic을 ROS2 `/robot5/scan`, `/robot11/scan`으로 수동 bridge하여 사용
+- multi-robot map merge 패키지 설치 및 후속 구조 검토
+
+## 미완료 항목
+
+아래 항목은 Gazebo 환경에서 최종 완료하지 않았다.
+
+- 두 로봇의 안정적인 장시간 AutoSLAM
+- 최종 merged `/map` 생성
+- merged map 저장
+
+## 종료 사유
+
+robot spawn 시 Gazebo `gz-sim-sensors-system`의 rendering thread에서 반복적으로 crash가 발생하였다.
+
+대표 증상:
+
+- `Scene already exists with name: scene`
+- `SensorsPrivate::RenderThread()`
+- `OgreScene::InitImpl()`
+- `Segmentation fault` / `Aborted`
+
+DDS / ROS2 namespace / TF 문제와는 별개의 Gazebo rendering / sensor 초기화 문제로 판단하였다.
+
+world의 sensor render engine도 확인 및 테스트하였으나 동일한 crash가 반복되어,
+Gazebo 자체 디버깅에 시간을 더 사용하지 않고 프로젝트를 종료하기로 결정하였다.
+
+## 다음 단계
+
+멀티로봇 SLAM 구조는 Isaac Sim 기반 IDC / 병원 자동화 프로젝트로 이관한다.
+
+예정 구조:
+
+Isaac Sim
+- AMR1 / AMR2
+- 2D LiDAR
+- odometry
+- TF
+- ROS2 Bridge
+
+ROS2
+- slam_toolbox x2
+- Nav2
+- autonomous exploration
+- multirobot_map_merge
+- RViz2
+- map_saver
+
+Gazebo 프로젝트의 목적이었던 멀티로봇 namespace / TF / SLAM / Nav2 구조 학습은 완료하였으며,
+최종 멀티로봇 AutoSLAM 및 map merge 검증은 Isaac Sim 환경에서 계속한다.
