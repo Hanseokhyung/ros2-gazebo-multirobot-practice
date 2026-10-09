@@ -1,5 +1,7 @@
 # Gazebo Multi-Robot Practice Progress
 
+> 최신 상태(2026-10-10): Gazebo 실습 종료 후 [hp_dt / Isaac Sim으로 이관](02_isaac_transfer.md)하여 두 AMR 자동 SLAM·탐색·맵 병합 검증을 이어간다. 아래 내용은 당시 진행 기록이며, 현재 구조·검증·미완료 범위는 이관 기록을 기준으로 읽는다.
+
 ## 현재 구성
 
 - ROS 2 Jazzy
@@ -434,7 +436,7 @@ Gazebo 자체 디버깅에 시간을 더 사용하지 않고 프로젝트를 종
 
 멀티로봇 SLAM 구조는 Isaac Sim 기반 IDC / 병원 자동화 프로젝트로 이관한다.
 
-예정 구조:
+당시 이관 예정 구조(현재 구현과 변경점은 [이관 기록](02_isaac_transfer.md) 참조):
 
 Isaac Sim
 - AMR1 / AMR2
