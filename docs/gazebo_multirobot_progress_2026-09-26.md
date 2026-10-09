@@ -401,7 +401,7 @@ Gazebo 기반 TurtleBot4 멀티로봇 실습은 아래 항목까지 검증하였
 - namespaced TF를 global `/tf`, `/tf_static`으로 relay
 - `world -> robot5/map`
 - `world -> robot11/map`
-- RViz2에서 멀티로봇 TF / RobotModel / Scan / Map 구성
+- RViz2에서 멀티로봇 TF / RobotModel / Scan 구성(저장 설정 기준). 당시 Map 구성 기록은 `two_robots.rviz`에 Map 표시 항목이 없어 확인되지 않음
 - robot5 / robot11 각각 `slam_toolbox` 실행
 - robot5 / robot11 각각 Nav2 lifecycle active 확인
 - `explore_lite`에서 Nav2 goal 전달까지 확인
